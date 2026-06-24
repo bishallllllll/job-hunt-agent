@@ -36,7 +36,7 @@ The Job Hunt Agent system is designed as a Python CLI suite and modular package.
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| 1 | E2E Test Suite | Create comprehensive E2E test infra, tests Tiers 1-4 | None | IN_PROGRESS (Conv ID: 8b285ed6-4d17-4767-a246-791cd10b1b7c) |
+| 1 | E2E Test Suite | Create comprehensive E2E test infra, tests Tiers 1-4 | None | DONE |
 | 2 | R1: Job Search & Fit Scoring | Implement search, scam filter, fit scoring | M1 | IN_PROGRESS (Conv ID: 8e2b6df5-ff70-4ba6-88a0-995d53b75aa9) |
 | 3 | R2: Tailoring Resume & Cover Letters | Tailor resume bullets and cover letters | M1, M2 | PLANNED |
 | 4 | R3: Tracker & Filesystem | Write to spreadsheet, organize under `/Jobs/` | M1, M3 | PLANNED |
