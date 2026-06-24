@@ -36,13 +36,13 @@ The Job Hunt Agent system is designed as a Python CLI suite and modular package.
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| 1 | E2E Test Suite | Create comprehensive E2E test infra, tests Tiers 1-4 | None | DONE |
-| 2 | R1: Job Search & Fit Scoring | Implement search, scam filter, fit scoring | M1 | IN_PROGRESS (Conv ID: 8e2b6df5-ff70-4ba6-88a0-995d53b75aa9) |
-| 3 | R2: Tailoring Resume & Cover Letters | Tailor resume bullets and cover letters | M1, M2 | PLANNED |
-| 4 | R3: Tracker & Filesystem | Write to spreadsheet, organize under `/Jobs/` | M1, M3 | PLANNED |
-| 5 | R4: Auto-Apply | Automated form filling with Playwright/mock | M1, M4 | PLANNED |
-| 6 | R5: Email & Calendar | Email monitoring & calendar event scheduling | M1, M5 | PLANNED |
-| 7 | R6 & Final Validation | Manual, mock environment validation & Tier 5 coverage hardening | M1-M6 | PLANNED |
+| 1 | E2E Test Suite | Create comprehensive E2E test infra, tests Tiers 1-4 | None | DONE (Conv ID: 438c2d05-4b4c-4360-bd90-e94e77f7c3e3) |
+| 2 | R1: Job Search & Fit Scoring | Implement search, scam filter, fit scoring | M1 | DONE (Conv ID: d5cc5189-7dc1-4516-a279-ec213b684250) |
+| 3 | R2: Tailoring Resume & Cover Letters | Tailor resume bullets and cover letters | M1, M2 | DONE (Conv ID: d5cc5189-7dc1-4516-a279-ec213b684250) |
+| 4 | R3: Tracker & Filesystem | Write to spreadsheet, organize under `/Jobs/` | M1, M3 | DONE (Conv ID: d5cc5189-7dc1-4516-a279-ec213b684250) |
+| 5 | R4: Auto-Apply | Automated form filling with Playwright/mock | M1, M4 | DONE (Conv ID: d5cc5189-7dc1-4516-a279-ec213b684250) |
+| 6 | R5: Email & Calendar | Email monitoring & calendar event scheduling | M1, M5 | DONE (Conv ID: d5cc5189-7dc1-4516-a279-ec213b684250) |
+| 7 | R6 & Final Validation | Manual, mock environment validation & Tier 5 coverage hardening | M1-M6 | DONE (Conv ID: d5cc5189-7dc1-4516-a279-ec213b684250) |
 
 ## Interface Contracts
 ### `job_hunt_agent.search` ↔ `job_hunt_agent.customizer`
