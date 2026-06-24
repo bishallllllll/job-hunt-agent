@@ -43,7 +43,8 @@ def candidate_profile() -> dict:
         "email": "bishal.sarkar@example.com",
         "education": "12th pass",
         "location": "Tripura",
-        "skills": ["Python", "Linux", "Networking"]
+        "skills": ["Python", "Linux", "Networking"],
+        "qualifications": "Completed 12th standard. Skilled in Python automation, Linux administration, and network routing."
     }
 
 @pytest.fixture

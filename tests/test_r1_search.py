@@ -211,3 +211,106 @@ def test_search_jobs_include_scams():
     assert "job_5" in scam_ids
     assert "job_6" in scam_ids
     assert "job_7" in scam_ids
+
+
+# --- Additional Tier 1 Tests for F1 (Job Search) ---
+
+def test_search_jobs_by_query_happy():
+    """Tier 1: Searching by query returns only matching non-scam jobs.
+    """
+    jobs = search_jobs(query="Linux", location="")
+    assert len(jobs) > 0
+    for job in jobs:
+        assert job["is_scam"] is False
+        assert "linux" in job["position"].lower() or "linux" in job["description"].lower()
+
+
+def test_search_jobs_by_location_happy():
+    """Tier 1: Searching by location returns only matching non-scam jobs in that location.
+    """
+    jobs = search_jobs(query="", location="Tripura")
+    assert len(jobs) > 0
+    for job in jobs:
+        assert job["is_scam"] is False
+        assert "tripura" in job["location"].lower()
+
+
+def test_search_jobs_by_empty_criteria_happy():
+    """Tier 1: Searching by empty criteria (both query and location empty) returns all non-scam jobs.
+    """
+    jobs = search_jobs(query="", location="")
+    assert len(jobs) == 5  # 8 total mock jobs minus 3 scams
+
+
+# --- Additional Tier 2 Tests (Boundary & Corner Cases) for F1 & F3 ---
+
+def test_search_jobs_extremely_long_query():
+    """Tier 2: Extremely long query does not crash and returns empty list.
+    """
+    long_query = "a" * 1000
+    jobs = search_jobs(query=long_query, location="")
+    assert jobs == []
+
+
+def test_search_jobs_query_special_characters():
+    """Tier 2: Query with regex/special characters does not break search.
+    """
+    special_query = ".*+?^${}()|[]\\"
+    jobs = search_jobs(query=special_query, location="")
+    assert jobs == []
+
+
+def test_search_jobs_non_matching_criteria():
+    """Tier 2: Search with non-matching query returns empty list.
+    """
+    jobs = search_jobs(query="nonexistentjobsearchquery", location="Mars")
+    assert jobs == []
+
+
+def test_search_jobs_scraper_not_implemented_error_production():
+    """Tier 2: In production mode (SETTINGS['USE_MOCK'] = False), scraping raises NotImplementedError.
+    """
+    from job_hunt_agent.search import SETTINGS
+    original_val = SETTINGS.get("USE_MOCK", True)
+    try:
+        SETTINGS["USE_MOCK"] = False
+        with pytest.raises(NotImplementedError) as excinfo:
+            search_jobs(query="", location="")
+        assert "Network calls disabled in CODE_ONLY mode." in str(excinfo.value)
+    finally:
+        SETTINGS["USE_MOCK"] = original_val
+
+
+def test_search_jobs_case_insensitivity():
+    """Tier 2: Check case insensitivity in query and location search.
+    """
+    jobs_caps = search_jobs(query="PYTHON", location="REMOTE")
+    jobs_lower = search_jobs(query="python", location="remote")
+    assert len(jobs_caps) == len(jobs_lower)
+    assert [j["job_id"] for j in jobs_caps] == [j["job_id"] for j in jobs_lower]
+
+
+def test_calculate_fit_score_profile_missing_skills():
+    """Tier 2 (F3): Profile with missing/empty skills handles it gracefully and returns a valid fit score.
+    """
+    job = {
+        "position": "Junior Python Scripting Developer",
+        "location": "Remote",
+        "description": "Looking for a junior developer to write Python scripts for automating Linux server administration. Basic understanding of TCP/IP networking, routing, and DNS is a plus. Perfect for freshers or high school graduates with strong programming logic."
+    }
+    
+    # Missing 'skills' key
+    profile_no_skills = {
+        "name": "Test Candidate",
+        "education": "12th pass",
+        "location_pref": ["Remote"],
+        "qualifications": "Testing qualifications."
+    }
+    score = calculate_fit_score(job, profile_no_skills)
+    assert 1 <= score <= 10
+    
+    # Empty skills list
+    profile_empty_skills = profile_no_skills.copy()
+    profile_empty_skills["skills"] = []
+    score2 = calculate_fit_score(job, profile_empty_skills)
+    assert 1 <= score2 <= 10
