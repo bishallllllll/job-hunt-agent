@@ -103,7 +103,7 @@ class MockHTTPRequestHandler(BaseHTTPRequestHandler):
                             "content": payload
                         }
                     else:
-                        form_fields[field_name] = payload.decode("utf-8").strip()
+                        form_fields[field_name] = payload.decode("utf-8").strip().replace("\r\n", "\n")
             
             # Validation logic
             name = form_fields.get("name", "")

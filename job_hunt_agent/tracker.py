@@ -11,7 +11,10 @@ def validate_path_in_jobs(path: str, jobs_dir: str) -> str:
     """
     abs_jobs_dir = os.path.abspath(jobs_dir)
     abs_path = os.path.abspath(path)
-    if not abs_path.startswith(abs_jobs_dir):
+    try:
+        if os.path.commonpath([abs_jobs_dir, abs_path]) != abs_jobs_dir:
+            raise ValueError(f"Path traversal detected! Path '{path}' is outside Jobs directory '{jobs_dir}'")
+    except Exception:
         raise ValueError(f"Path traversal detected! Path '{path}' is outside Jobs directory '{jobs_dir}'")
     return abs_path
 
@@ -84,6 +87,8 @@ def update_job_status(job_id: str, status: str, tracker_path: str, notes: str = 
             rows.append(headers)
             for row in reader:
                 if row and row[0] == job_id:
+                    if len(row) < 10:
+                        row.extend([""] * (10 - len(row)))
                     # Update status
                     row[8] = status
                     if notes is not None:

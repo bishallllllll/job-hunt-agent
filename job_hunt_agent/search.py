@@ -4,9 +4,11 @@ import abc
 # Bishal Sarkar's Profile Constant
 BISHAL_PROFILE = {
     "name": "Bishal Sarkar",
+    "email": "bishal.sarkar@example.com",
     "education": "12th pass",
     "skills": ["Python", "Linux", "Networking"],
-    "location_pref": ["Agartala", "Tripura", "Remote"]
+    "location_pref": ["Agartala", "Tripura", "Remote"],
+    "qualifications": "Completed 12th standard. Skilled in Python automation, Linux administration, and network routing."
 }
 
 # Settings for scraper selection

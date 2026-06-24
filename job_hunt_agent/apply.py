@@ -14,6 +14,16 @@ def apply_to_job(url: str, candidate_info: dict, resume_path: str, screenshot_pa
             "screenshot": None
         }
 
+    info = candidate_info.copy()
+    if not info.get("qualifications"):
+        education = info.get("education", "")
+        skills = info.get("skills", [])
+        if isinstance(skills, list):
+            skills_str = ", ".join(skills)
+        else:
+            skills_str = str(skills)
+        info["qualifications"] = f"Education: {education}. Skills: {skills_str}."
+
     try:
         with sync_playwright() as p:
             # Launch chromium in headless mode
@@ -26,14 +36,14 @@ def apply_to_job(url: str, candidate_info: dict, resume_path: str, screenshot_pa
             
             # Fill out the form fields
             # We use robust selectors (e.g. name, ID, placeholder or label)
-            page.fill('input[name="name"]', candidate_info.get("name", ""))
-            page.fill('input[name="email"]', candidate_info.get("email", ""))
+            page.fill('input[name="name"]', info.get("name", ""))
+            page.fill('input[name="email"]', info.get("email", ""))
             
             # Qualifications could be an input or textarea
             if page.locator('textarea[name="qualifications"]').count() > 0:
-                page.fill('textarea[name="qualifications"]', candidate_info.get("qualifications", ""))
+                page.fill('textarea[name="qualifications"]', info.get("qualifications", ""))
             elif page.locator('input[name="qualifications"]').count() > 0:
-                page.fill('input[name="qualifications"]', candidate_info.get("qualifications", ""))
+                page.fill('input[name="qualifications"]', info.get("qualifications", ""))
                 
             # File upload for the resume
             page.set_input_files('input[type="file"]', resume_path)
