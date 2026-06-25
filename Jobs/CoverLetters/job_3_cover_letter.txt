@@ -1,0 +1,16 @@
+Dear Hiring Manager,
+
+I am writing to express my enthusiastic interest in the Linux System Administrator Trainee position at Global Hosters. As a motivated candidate with a strong foundation in Python, Linux, Networking, I am excited about the opportunity to contribute to your team.
+
+My technical background includes practical experience in:
+- Designed and implemented Python automation scripts to optimize routine backup routines.
+- Managed local Linux server environments, managing user access rights and shell scripts.
+- Configured and maintained local network switch and router configurations, ensuring high uptime.
+
+I am particularly drawn to this role because of Global Hosters's focus on efficiency and technical excellence. I am confident that my hands-on knowledge of system administration and automation will allow me to integrate quickly and deliver value.
+
+Thank you for your time and consideration. I look forward to the possibility of discussing how my skills align with your needs.
+
+Sincerely,
+
+Bishal Sarkar

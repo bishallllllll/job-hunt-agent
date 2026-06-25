@@ -4,11 +4,43 @@ import abc
 # Bishal Sarkar's Profile Constant
 BISHAL_PROFILE = {
     "name": "Bishal Sarkar",
-    "email": "bishal.sarkar@example.com",
-    "education": "12th pass",
-    "skills": ["Python", "Linux", "Networking"],
+    "email": "bishalsarkar999997@gmail.com",
+    "phone": "+91 7630032632",
+    "address": "Madhya Bhuban Ban, Agartala, Tripura - 799002",
+    "dob": "2001-07-19",
+    "education": "BA in Psychology (ICFAI Tripura University, 2023-2026), Higher Secondary (Henry Derozio Academy, 2018-2020)",
+    "skills": [
+        "Python", "Bash", "Bash Scripting", "Linux",
+        "AI & Machine Learning", "Deep Learning", "LLMs", "Generative AI",
+        "AI Agents", "Agentic AI Development", "Prompt Engineering",
+        "Web Development", "Front-End", "Back-End", "API Development",
+        "Cybersecurity", "Networking",
+        "Financial Analysis", "FX Trading",
+        "Critical Thinking", "Remote Collaboration"
+    ],
+    "certifications": [
+        "Python Essentials (Cisco, 01/2026)",
+        "AI Fundamentals (02/2025)",
+        "Introduction to Cybersecurity (Cisco, 12/2025)",
+        "Prompt Engineering with the OpenAI API (DataCamp, 04/2026)",
+        "Introduction to AI Agents (DataCamp, 04/2026)",
+        "Working with the OpenAI API (DataCamp, 04/2026)"
+    ],
+    "work_experience": "Branch Relationship Executive at SBI Card (01/2026 - 03/2026, Agartala)",
+    "projects": [
+        "Aggressive LLM-Powered Forex Trading Bot (Multi-Agent Architecture, Azure OpenAI / AWS Bedrock)",
+        "Forex Agentic — Autonomous Multi-Agent Trading System (github.com/bishallllllll/forex-agentic)"
+    ],
+    "github": "github.com/bishallllllll",
+    "website": "bishalsarkar.me",
+    "linkedin": "linkedin.com/in/bishalsarkar",
     "location_pref": ["Agartala", "Tripura", "Remote"],
-    "qualifications": "Completed 12th standard. Skilled in Python automation, Linux administration, and network routing."
+    "languages": ["English", "Bengali", "Hindi"],
+    "qualifications": "BA in Psychology from ICFAI Tripura University. Cisco-certified in Python Essentials and Cybersecurity. "
+        "DataCamp-certified in Prompt Engineering, AI Agents, and OpenAI API. "
+        "Built multi-agent AI trading systems with Python, LLMs, and cloud APIs. "
+        "Skilled in Python automation, Bash scripting, Linux administration, web development, and networking. "
+        "Experience as Branch Relationship Executive at SBI Card."
 }
 
 # Settings for scraper selection

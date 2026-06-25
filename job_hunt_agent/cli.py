@@ -21,6 +21,13 @@ from job_hunt_agent.mock_env import (
     MockCalendarService
 )
 
+def _get_services(live=False):
+    """Return Gmail and Calendar service instances based on mode."""
+    if live:
+        from job_hunt_agent.real_services import RealGmailService, RealCalendarService
+        return RealGmailService(), RealCalendarService()
+    return MockGmailService(), MockCalendarService()
+
 def get_job_by_id(job_id: str) -> dict:
     """Helper to resolve job details by ID from mock list or feed.
     """
@@ -97,16 +104,18 @@ def main():
     apply_parser.add_argument("--tracker-path", default=None, help="Path to tracker CSV file")
 
     # Sync-emails subcommand
-    sync_emails_parser = subparsers.add_parser("sync-emails", help="Poll mock emails and update tracker status")
+    sync_emails_parser = subparsers.add_parser("sync-emails", help="Poll emails and update tracker status")
     sync_emails_parser.add_argument("--jobs-dir", default="/Jobs", help="Jobs directory path")
     sync_emails_parser.add_argument("--tracker-path", default=None, help="Path to tracker CSV file")
+    sync_emails_parser.add_argument("--live", action="store_true", help="Use real Gmail API instead of mock")
 
     # Sync-calendar subcommand
-    sync_calendar_parser = subparsers.add_parser("sync-calendar", help="Schedule a mock calendar event")
+    sync_calendar_parser = subparsers.add_parser("sync-calendar", help="Schedule a calendar event")
     sync_calendar_parser.add_argument("--summary", required=True, help="Event summary")
     sync_calendar_parser.add_argument("--start-time", required=True, help="Event start time (ISO)")
     sync_calendar_parser.add_argument("--end-time", required=True, help="Event end time (ISO)")
     sync_calendar_parser.add_argument("--description", default="", help="Event description")
+    sync_calendar_parser.add_argument("--live", action="store_true", help="Use real Google Calendar API instead of mock")
 
     # Run-all subcommand
     run_all_parser = subparsers.add_parser("run-all", help="Run the entire job search, customization, apply, and sync pipeline")
@@ -115,6 +124,7 @@ def main():
     run_all_parser.add_argument("--jobs-dir", default="/Jobs", help="Jobs directory path")
     run_all_parser.add_argument("--tracker-path", default=None, help="Path to tracker CSV file")
     run_all_parser.add_argument("--url", default="http://localhost:5000/apply", help="Application form URL")
+    run_all_parser.add_argument("--live", action="store_true", help="Use real Gmail/Calendar APIs instead of mocks")
 
     # If no arguments provided, show help
     if len(sys.argv) == 1:
@@ -236,7 +246,8 @@ def main():
 
     elif args.command == "sync-emails":
         tracker_path = args.tracker_path or os.path.join(args.jobs_dir, "job_tracker.csv")
-        service = MockGmailService()
+        gmail_service, _ = _get_services(getattr(args, 'live', False))
+        service = gmail_service
         emails = poll_gmail(service)
 
         tracked_jobs = []
@@ -291,7 +302,8 @@ def main():
                     print(f"Updated job {matched_job_id} ({matched_company}) to '{status}' based on email.")
 
     elif args.command == "sync-calendar":
-        service = MockCalendarService()
+        _, calendar_service = _get_services(getattr(args, 'live', False))
+        service = calendar_service
         event_details = {
             "summary": args.summary,
             "start_time": args.start_time,
@@ -314,8 +326,7 @@ def main():
         print(f"Found {len(high_fit_jobs)} high-fit jobs to apply to.")
 
         # Initialize services
-        gmail_service = MockGmailService()
-        calendar_service = MockCalendarService()
+        gmail_service, calendar_service = _get_services(getattr(args, 'live', False))
 
         for job in high_fit_jobs:
             job_id = job["job_id"]
