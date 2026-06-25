@@ -28,6 +28,14 @@ def _get_services(live=False):
         return RealGmailService(), RealCalendarService()
     return MockGmailService(), MockCalendarService()
 
+def _get_sheets_service(live=False, spreadsheet_id=None):
+    """Return Sheets service instance based on mode."""
+    if live:
+        from job_hunt_agent.real_services import RealSheetsService
+        return RealSheetsService(spreadsheet_id=spreadsheet_id)
+    return None
+
+
 def get_job_by_id(job_id: str) -> dict:
     """Helper to resolve job details by ID from mock list or feed.
     """
@@ -93,6 +101,8 @@ def main():
     track_parser.add_argument("--date-applied", default=None, help="Date applied (YYYY-MM-DD)")
     track_parser.add_argument("--jobs-dir", default="/Jobs", help="Jobs directory path")
     track_parser.add_argument("--tracker-path", default=None, help="Path to tracker CSV file")
+    track_parser.add_argument("--live", action="store_true", help="Use real APIs (Google Sheets) instead of mock")
+    track_parser.add_argument("--spreadsheet-id", default=None, help="Google Sheets Spreadsheet ID")
 
     # Apply subcommand
     apply_parser = subparsers.add_parser("apply", help="Automatically apply to a job using Playwright")
@@ -102,12 +112,15 @@ def main():
     apply_parser.add_argument("--screenshot-path", default=None, help="Path to save application screenshot")
     apply_parser.add_argument("--jobs-dir", default="/Jobs", help="Jobs directory path")
     apply_parser.add_argument("--tracker-path", default=None, help="Path to tracker CSV file")
+    apply_parser.add_argument("--live", action="store_true", help="Use real APIs (Google Sheets) instead of mock")
+    apply_parser.add_argument("--spreadsheet-id", default=None, help="Google Sheets Spreadsheet ID")
 
     # Sync-emails subcommand
     sync_emails_parser = subparsers.add_parser("sync-emails", help="Poll emails and update tracker status")
     sync_emails_parser.add_argument("--jobs-dir", default="/Jobs", help="Jobs directory path")
     sync_emails_parser.add_argument("--tracker-path", default=None, help="Path to tracker CSV file")
     sync_emails_parser.add_argument("--live", action="store_true", help="Use real Gmail API instead of mock")
+    sync_emails_parser.add_argument("--spreadsheet-id", default=None, help="Google Sheets Spreadsheet ID")
 
     # Sync-calendar subcommand
     sync_calendar_parser = subparsers.add_parser("sync-calendar", help="Schedule a calendar event")
@@ -125,6 +138,8 @@ def main():
     run_all_parser.add_argument("--tracker-path", default=None, help="Path to tracker CSV file")
     run_all_parser.add_argument("--url", default="http://localhost:5000/apply", help="Application form URL")
     run_all_parser.add_argument("--live", action="store_true", help="Use real Gmail/Calendar APIs instead of mocks")
+    run_all_parser.add_argument("--spreadsheet-id", default=None, help="Google Sheets Spreadsheet ID")
+
 
     # If no arguments provided, show help
     if len(sys.argv) == 1:
@@ -198,6 +213,12 @@ def main():
                 print(f"Successfully added job {args.job_id} to tracker.")
             else:
                 print(f"Job {args.job_id} already exists in tracker.")
+
+            if getattr(args, "live", False):
+                sheets_service = _get_sheets_service(live=True, spreadsheet_id=args.spreadsheet_id)
+                if sheets_service and sheets_service.spreadsheet_id:
+                    sheets_service.add_job(job_copy)
+                    print(f"Synced job {args.job_id} addition to Google Sheets.")
         else:
             success = update_job_status(
                 job_id=args.job_id,
@@ -212,6 +233,17 @@ def main():
             else:
                 print(f"Job {args.job_id} not found in tracker to update.")
                 sys.exit(1)
+
+            if getattr(args, "live", False):
+                sheets_service = _get_sheets_service(live=True, spreadsheet_id=args.spreadsheet_id)
+                if sheets_service and sheets_service.spreadsheet_id:
+                    sheets_service.update_job(
+                        job_id=args.job_id,
+                        status=args.status,
+                        notes=args.notes,
+                        date_applied=args.date_applied
+                    )
+                    print(f"Synced job {args.job_id} update to Google Sheets.")
 
     elif args.command == "apply":
         tracker_path = args.tracker_path or os.path.join(args.jobs_dir, "job_tracker.csv")
@@ -240,6 +272,16 @@ def main():
                 date_applied=datetime.now().strftime("%Y-%m-%d"),
                 jobs_dir=args.jobs_dir
             )
+            if getattr(args, "live", False):
+                sheets_service = _get_sheets_service(live=True, spreadsheet_id=args.spreadsheet_id)
+                if sheets_service and sheets_service.spreadsheet_id:
+                    sheets_service.update_job(
+                        job_id=args.job_id,
+                        status="Applied",
+                        notes="Applied successfully via CLI.",
+                        date_applied=datetime.now().strftime("%Y-%m-%d")
+                    )
+                    print(f"Synced application for job {args.job_id} to Google Sheets.")
         else:
             print(f"Failed to apply to job {args.job_id}: {res.get('message')}")
             sys.exit(1)
@@ -247,6 +289,7 @@ def main():
     elif args.command == "sync-emails":
         tracker_path = args.tracker_path or os.path.join(args.jobs_dir, "job_tracker.csv")
         gmail_service, _ = _get_services(getattr(args, 'live', False))
+        sheets_service = _get_sheets_service(getattr(args, 'live', False), getattr(args, 'spreadsheet_id', None))
         service = gmail_service
         emails = poll_gmail(service)
 
@@ -300,6 +343,13 @@ def main():
                         jobs_dir=args.jobs_dir
                     )
                     print(f"Updated job {matched_job_id} ({matched_company}) to '{status}' based on email.")
+                    if sheets_service and sheets_service.spreadsheet_id:
+                        sheets_service.update_job(
+                            job_id=matched_job_id,
+                            status=status,
+                            notes=notes
+                        )
+                        print(f"Synced update for job {matched_job_id} to Google Sheets.")
 
     elif args.command == "sync-calendar":
         _, calendar_service = _get_services(getattr(args, 'live', False))
@@ -327,12 +377,16 @@ def main():
 
         # Initialize services
         gmail_service, calendar_service = _get_services(getattr(args, 'live', False))
+        sheets_service = _get_sheets_service(getattr(args, 'live', False), getattr(args, 'spreadsheet_id', None))
 
         for job in high_fit_jobs:
             job_id = job["job_id"]
 
             # Add to tracker
             add_job_to_tracker(job, tracker_path, jobs_dir=args.jobs_dir)
+            if sheets_service and sheets_service.spreadsheet_id:
+                sheets_service.add_job(job)
+                print(f"Synced job {job_id} addition to Google Sheets.")
 
             # Tailor
             tailored = customize_for_job(job, BISHAL_PROFILE)
@@ -374,6 +428,14 @@ def main():
                     jobs_dir=args.jobs_dir
                 )
                 print(f"Applied to {job_id} and updated tracker.")
+                if sheets_service and sheets_service.spreadsheet_id:
+                    sheets_service.update_job(
+                        job_id=job_id,
+                        status="Applied",
+                        notes="Applied successfully via run-all pipeline.",
+                        date_applied=datetime.now().strftime("%Y-%m-%d")
+                    )
+                    print(f"Synced application update for job {job_id} to Google Sheets.")
             else:
                 print(f"Failed applying to {job_id}: {apply_res.get('message')}")
 
@@ -451,8 +513,16 @@ def main():
                         jobs_dir=args.jobs_dir
                     )
                     print(f"Updated job {matched_job_id} to {status} based on email.")
+                    if sheets_service and sheets_service.spreadsheet_id:
+                        sheets_service.update_job(
+                            job_id=matched_job_id,
+                            status=status,
+                            notes=notes
+                        )
+                        print(f"Synced update for job {matched_job_id} to Google Sheets.")
     else:
         parser.print_help()
 
 if __name__ == "__main__":
     main()
+

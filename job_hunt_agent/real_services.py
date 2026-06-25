@@ -193,3 +193,108 @@ def _extract_body(payload: dict) -> str:
                     break
     
     return body_text[:5000]  # Limit body size
+
+
+def get_real_sheets_service():
+    """Build and return a real Google Sheets API service client."""
+    from googleapiclient.discovery import build
+    creds = _get_google_credentials()
+    return build('sheets', 'v4', credentials=creds)
+
+
+class RealSheetsService:
+    """Adapter that wraps the Google Sheets API to append/update job rows."""
+    
+    def __init__(self, spreadsheet_id=None):
+        self.spreadsheet_id = spreadsheet_id or os.environ.get("SPREADSHEET_ID")
+        self._service = None
+        if self.spreadsheet_id:
+            try:
+                self._service = get_real_sheets_service()
+            except Exception as e:
+                print(f"Warning: Could not initialize Google Sheets service: {e}")
+
+    def add_job(self, job: dict) -> bool:
+        """Add a job row to Google Sheets."""
+        from datetime import datetime
+        if not self._service or not self.spreadsheet_id:
+            return False
+        try:
+            row_data = [
+                job.get("job_id", ""),
+                job.get("company", ""),
+                job.get("position", ""),
+                job.get("source", "MockFeed"),
+                job.get("location", ""),
+                job.get("salary", ""),
+                datetime.now().strftime("%Y-%m-%d"),
+                job.get("date_applied", ""),
+                job.get("status", "Found"),
+                job.get("notes", "")
+            ]
+            body = {'values': [row_data]}
+            self._service.spreadsheets().values().append(
+                spreadsheetId=self.spreadsheet_id,
+                range="Sheet1!A:J",
+                valueInputOption="USER_ENTERED",
+                body=body
+            ).execute()
+            return True
+        except Exception as e:
+            print(f"Warning: Failed to add job to Google Sheets: {e}")
+            return False
+
+    def update_job(self, job_id: str, status: str, notes: str = None, date_applied: str = None) -> bool:
+        """Update a job status, notes, or date_applied in Google Sheets."""
+        if not self._service or not self.spreadsheet_id:
+            return False
+        try:
+            # Read existing sheet values to locate the correct row
+            result = self._service.spreadsheets().values().get(
+                spreadsheetId=self.spreadsheet_id,
+                range="Sheet1!A:J"
+            ).execute()
+            rows = result.get('values', [])
+            if not rows:
+                return False
+            
+            # Find the row index (1-based, index 0 is header row)
+            row_idx = -1
+            for idx, row in enumerate(rows):
+                if row and row[0] == job_id:
+                    row_idx = idx + 1
+                    break
+            
+            if row_idx == -1:
+                return False
+            
+            # Columns: A=Job ID, B=Company, C=Position, D=Source, E=Location, F=Salary, G=Date Found, H=Date Applied, I=Status, J=Notes
+            # Update Status (Col I, index 8)
+            self._service.spreadsheets().values().update(
+                spreadsheetId=self.spreadsheet_id,
+                range=f"Sheet1!I{row_idx}",
+                valueInputOption="USER_ENTERED",
+                body={'values': [[status]]}
+            ).execute()
+            
+            if notes is not None:
+                self._service.spreadsheets().values().update(
+                    spreadsheetId=self.spreadsheet_id,
+                    range=f"Sheet1!J{row_idx}",
+                    valueInputOption="USER_ENTERED",
+                    body={'values': [[notes]]}
+                ).execute()
+                
+            if date_applied is not None:
+                self._service.spreadsheets().values().update(
+                    spreadsheetId=self.spreadsheet_id,
+                    range=f"Sheet1!H{row_idx}",
+                    valueInputOption="USER_ENTERED",
+                    body={'values': [[date_applied]]}
+                ).execute()
+                
+            return True
+        except Exception as e:
+            print(f"Warning: Failed to update job in Google Sheets: {e}")
+            return False
+

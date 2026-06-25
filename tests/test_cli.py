@@ -119,3 +119,39 @@ def test_cli_run_all(monkeypatch, capsys, mock_server_url, jobs_dir, mock_gmail_
     assert "Found" in captured.out
     assert "Applied to job_1" in captured.out
     assert "Scheduled interview for job_1" in captured.out
+
+
+def test_cli_track_live_sheets(monkeypatch, capsys, jobs_dir, mocker):
+    tracker_path = os.path.join(jobs_dir, "job_tracker.csv")
+    
+    # Mock RealSheetsService
+    mock_sheets_cls = mocker.patch("job_hunt_agent.real_services.RealSheetsService")
+    mock_instance = mock_sheets_cls.return_value
+    mock_instance.spreadsheet_id = "test-spreadsheet-id"
+    mock_instance.add_job.return_value = True
+    mock_instance.update_job.return_value = True
+    
+    # 1. Track Add in live mode
+    monkeypatch.setattr("sys.argv", [
+        "cli.py", "track", "job_1", "--action", "add", "--status", "Found", 
+        "--jobs-dir", jobs_dir, "--tracker-path", tracker_path,
+        "--live", "--spreadsheet-id", "test-spreadsheet-id"
+    ])
+    main()
+    captured = capsys.readouterr()
+    assert "Successfully added job job_1" in captured.out
+    assert "Synced job job_1 addition to Google Sheets" in captured.out
+    mock_instance.add_job.assert_called_once()
+    
+    # 2. Track Update in live mode
+    monkeypatch.setattr("sys.argv", [
+        "cli.py", "track", "job_1", "--action", "update", "--status", "Applied",
+        "--jobs-dir", jobs_dir, "--tracker-path", tracker_path,
+        "--live", "--spreadsheet-id", "test-spreadsheet-id"
+    ])
+    main()
+    captured = capsys.readouterr()
+    assert "Successfully updated job job_1" in captured.out
+    assert "Synced job job_1 update to Google Sheets" in captured.out
+    mock_instance.update_job.assert_called_once()
+
