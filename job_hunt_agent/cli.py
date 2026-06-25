@@ -86,6 +86,8 @@ def main():
     search_parser.add_argument("-q", "--query", default="", help="Search query")
     search_parser.add_argument("-l", "--location", default="", help="Location filter")
     search_parser.add_argument("--include-scams", action="store_true", help="Include flagged scams in results")
+    search_parser.add_argument("--live", action="store_true", help="Use real scrapers instead of mock")
+
 
     # Customize subcommand
     customize_parser = subparsers.add_parser("customize", help="Customize resume and cover letter for a job")
@@ -149,7 +151,15 @@ def main():
     args = parser.parse_args()
 
     if args.command == "search":
-        jobs = search_jobs(args.query, args.location, include_scams=args.include_scams)
+        from job_hunt_agent.search import SETTINGS
+        original_mock = SETTINGS.get("USE_MOCK", True)
+        if getattr(args, "live", False) or original_mock is False:
+            SETTINGS["USE_MOCK"] = False
+        try:
+            jobs = search_jobs(args.query, args.location, include_scams=args.include_scams)
+        finally:
+            SETTINGS["USE_MOCK"] = original_mock
+
         if not jobs:
             print("No jobs found matching the criteria.")
             return
@@ -370,7 +380,14 @@ def main():
     elif args.command == "run-all":
         tracker_path = args.tracker_path or os.path.join(args.jobs_dir, "job_tracker.csv")
         # Step 1: Search
-        jobs = search_jobs(args.query, args.location, include_scams=False)
+        from job_hunt_agent.search import SETTINGS
+        original_mock = SETTINGS.get("USE_MOCK", True)
+        if getattr(args, "live", False) or original_mock is False:
+            SETTINGS["USE_MOCK"] = False
+        try:
+            jobs = search_jobs(args.query, args.location, include_scams=False)
+        finally:
+            SETTINGS["USE_MOCK"] = original_mock
         # Step 2: Filter high fit
         high_fit_jobs = [j for j in jobs if j.get("fit_score", 0) >= 6]
         print(f"Found {len(high_fit_jobs)} high-fit jobs to apply to.")

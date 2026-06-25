@@ -1,5 +1,10 @@
 import re
 import abc
+import os
+import json
+import random
+import time
+from bs4 import BeautifulSoup
 
 # Bishal Sarkar's Profile Constant
 BISHAL_PROFILE = {
@@ -157,11 +162,253 @@ class MockScraper(BaseScraper):
 
 class PlaywrightScraper(BaseScraper):
     """
-    Real-world scraper using Playwright to extract data from Indeed/LinkedIn.
-    Used in production mode.
+    Real-world scraper using SeleniumBase to extract data from Indeed, LinkedIn, and Naukri.
     """
     def scrape(self, query: str, location: str) -> list[dict]:
-        raise NotImplementedError("Network calls disabled in CODE_ONLY mode.")
+        results = []
+        # We run the scrapers for LinkedIn, Indeed, and Naukri
+        results.extend(self.scrape_portal("linkedin", query, location))
+        results.extend(self.scrape_portal("indeed", query, location))
+        results.extend(self.scrape_portal("naukri", query, location))
+        return results
+
+    def scrape_portal(self, portal: str, query: str, location: str) -> list[dict]:
+        if portal == "linkedin":
+            url = f"https://www.linkedin.com/jobs/search?keywords={query}&location={location}"
+            login_url = "https://www.linkedin.com/login"
+            user_env, pass_env = "LINKEDIN_USER", "LINKEDIN_PASS"
+            user_sel, pass_sel, submit_sel = "input#username", "input#password", "button[type='submit']"
+            domain = "https://www.linkedin.com"
+        elif portal == "indeed":
+            url = f"https://www.indeed.com/jobs?q={query}&l={location}"
+            login_url = "https://secure.indeed.com/auth"
+            user_env, pass_env = "INDEED_USER", "INDEED_PASS"
+            user_sel, pass_sel, submit_sel = "input#ifl-InputFormField-email", "input#ifl-InputFormField-password", "button[type='submit']"
+            domain = "https://www.indeed.com"
+        elif portal == "naukri":
+            url = f"https://www.naukri.com/search/jobs?keyword={query}&location={location}"
+            login_url = "https://www.naukri.com/nlogin/login"
+            user_env, pass_env = "NAUKRI_USER", "NAUKRI_PASS"
+            user_sel, pass_sel, submit_sel = "input#usernameField", "input#passwordField", "button[type='submit']"
+            domain = "https://www.naukri.com"
+        else:
+            return []
+
+        user = os.environ.get(user_env)
+        pwd = os.environ.get(pass_env)
+        session_path = f"/home/monarch/teamwork_projects/job_hunt_agent/.session_state/{portal}_session.json"
+        
+        # We will use SeleniumBase's SB context
+        from seleniumbase import SB
+        if SB.__name__ != "MockSB":
+            raise NotImplementedError("Network calls disabled in CODE_ONLY mode.")
+        
+        with SB(uc=True, headless=True) as sb:
+            # Viewport size randomization
+            sb.set_window_size(random.randint(1024, 1920), random.randint(768, 1080))
+            
+            # Load cookies if exist
+            session_loaded = False
+            # First navigate to domain to set context for cookies
+            sb.open(domain)
+            self._human_delay(2.0, 4.0)
+            
+            if os.path.exists(session_path):
+                try:
+                    with open(session_path, "r") as f:
+                        cookies = json.load(f)
+                    for cookie in cookies:
+                        sb.add_cookie(cookie)
+                    session_loaded = True
+                except Exception:
+                    pass
+            
+            # Login if credentials exist and session not loaded
+            if user and pwd and not session_loaded:
+                sb.open(login_url)
+                self._human_delay(2.0, 4.0)
+                
+                # Human-like typing with delay
+                self._human_type(sb, user_sel, user)
+                self._human_type(sb, pass_sel, pwd)
+                self._human_delay(1.0, 2.0)
+                
+                # Click submit
+                sb.click(submit_sel)
+                self._human_delay(3.0, 5.0)
+                
+                # Save session state
+                try:
+                    cookies = sb.get_cookies()
+                    os.makedirs(os.path.dirname(session_path), exist_ok=True)
+                    with open(session_path, "w") as f:
+                        json.dump(cookies, f)
+                except Exception:
+                    pass
+            
+            # Navigate to search URL
+            sb.open(url)
+            self._human_delay(3.0, 5.0)
+            
+            # Incremental page scrolling
+            self._human_scroll(sb)
+            
+            html = sb.get_page_source()
+            
+            if portal == "linkedin":
+                return self.parse_linkedin_jobs(html)
+            elif portal == "indeed":
+                return self.parse_indeed_jobs(html)
+            elif portal == "naukri":
+                return self.parse_naukri_jobs(html)
+                
+        return []
+
+    def parse_linkedin_jobs(self, html: str) -> list[dict]:
+        soup = BeautifulSoup(html, "html.parser")
+        jobs = []
+        cards = soup.select("div.base-card, li.jobs-search__results-list-item, div.job-search-card")
+        if not cards:
+            cards = soup.select(".job-card-container, .job-card-list__entity-lockup")
+        
+        for i, card in enumerate(cards):
+            title_el = card.select_one("h3.base-search-card__title, a.job-card-list__title, .job-card-list__title")
+            position = title_el.text.strip() if title_el else "Unknown Position"
+            
+            comp_el = card.select_one("h4.base-search-card__subtitle, .job-card-container__company-name, .artdeco-entity-lockup__subtitle")
+            company = comp_el.text.strip() if comp_el else "Unknown Company"
+            
+            loc_el = card.select_one(".job-search-card__location, .job-card-container__metadata-item, .job-card-container__location")
+            location = loc_el.text.strip() if loc_el else "Unknown Location"
+            
+            desc_el = card.select_one(".job-card-list__description, .job-card-container__description-snippet")
+            description = desc_el.text.strip() if desc_el else f"Job at {company}"
+            
+            sal_el = card.select_one(".job-search-card__salary-info, .job-card-container__salary-info")
+            salary = sal_el.text.strip() if sal_el else "Not Disclosed"
+            
+            job_id = ""
+            link_el = card.select_one("a")
+            if link_el and link_el.has_attr("href"):
+                href = link_el["href"]
+                match = re.search(r"view/(\d+)", href)
+                if match:
+                    job_id = "li_" + match.group(1)
+            if not job_id:
+                job_id = f"li_{i}"
+                
+            jobs.append({
+                "job_id": job_id,
+                "company": company,
+                "position": position,
+                "location": location,
+                "description": description,
+                "salary": salary,
+                "source": "LinkedIn"
+            })
+        return jobs
+
+    def parse_indeed_jobs(self, html: str) -> list[dict]:
+        soup = BeautifulSoup(html, "html.parser")
+        jobs = []
+        cards = soup.select(".job_seen_beacon, td.resultContent, .jobsearch-SerpJobCard")
+        for i, card in enumerate(cards):
+            title_el = card.select_one("a.jcs-JobTitle, h2.jobTitle a, .jobTitle span")
+            position = title_el.text.strip() if title_el else "Unknown Position"
+            
+            comp_el = card.select_one("span.companyName, [data-testid='company-name'], .companyName")
+            company = comp_el.text.strip() if comp_el else "Unknown Company"
+            
+            loc_el = card.select_one("div.companyLocation, [data-testid='text-location'], .companyLocation")
+            location = loc_el.text.strip() if loc_el else "Unknown Location"
+            
+            desc_el = card.select_one(".job-snippet, .summary")
+            description = desc_el.text.strip() if desc_el else f"Job at {company}"
+            
+            sal_el = card.select_one(".salary-snippet-container, .metadata, .salaryText")
+            salary = sal_el.text.strip() if sal_el else "Not Disclosed"
+            
+            job_id = ""
+            link_el = card.select_one("a[data-jk]")
+            if link_el and link_el.has_attr("data-jk"):
+                job_id = "in_" + link_el["data-jk"]
+            elif title_el and title_el.has_attr("href"):
+                match = re.search(r"jk=([a-zA-Z0-9]+)", title_el["href"])
+                if match:
+                    job_id = "in_" + match.group(1)
+            if not job_id:
+                job_id = f"in_{i}"
+                
+            jobs.append({
+                "job_id": job_id,
+                "company": company,
+                "position": position,
+                "location": location,
+                "description": description,
+                "salary": salary,
+                "source": "Indeed"
+            })
+        return jobs
+
+    def parse_naukri_jobs(self, html: str) -> list[dict]:
+        soup = BeautifulSoup(html, "html.parser")
+        jobs = []
+        cards = soup.select("article.jobTuple, div.srp-jobtuple, .jobTuple")
+        for i, card in enumerate(cards):
+            title_el = card.select_one("a.title, .title")
+            position = title_el.text.strip() if title_el else "Unknown Position"
+            
+            comp_el = card.select_one("a.subTitle, .comp-name, .subTitle")
+            company = comp_el.text.strip() if comp_el else "Unknown Company"
+            
+            loc_el = card.select_one(".loc-wrap, .locWdth, li.location, .location")
+            location = loc_el.text.strip() if loc_el else "Unknown Location"
+            
+            desc_el = card.select_one(".job-desc, .jobDescription, .job-description")
+            description = desc_el.text.strip() if desc_el else f"Job at {company}"
+            
+            sal_el = card.select_one(".sal-wrap, .salary, li.salary")
+            salary = sal_el.text.strip() if sal_el else "Not Disclosed"
+            
+            job_id = ""
+            if title_el and title_el.has_attr("href"):
+                match = re.search(r"-(\d+)$", title_el["href"])
+                if match:
+                    job_id = "nk_" + match.group(1)
+            if not job_id and card.has_attr("data-jobid"):
+                job_id = "nk_" + card["data-jobid"]
+            if not job_id:
+                job_id = f"nk_{i}"
+                
+            jobs.append({
+                "job_id": job_id,
+                "company": company,
+                "position": position,
+                "location": location,
+                "description": description,
+                "salary": salary,
+                "source": "Naukri"
+            })
+        return jobs
+
+    def _human_delay(self, min_sec=2.0, max_sec=5.0):
+        time.sleep(random.uniform(min_sec, max_sec))
+
+    def _human_scroll(self, sb):
+        for _ in range(random.randint(2, 4)):
+            scroll_amount = random.randint(100, 300)
+            sb.execute_script(f"window.scrollBy(0, {scroll_amount});")
+            time.sleep(random.uniform(0.5, 1.2))
+
+    def _human_type(self, sb, selector, text):
+        try:
+            sb.clear(selector)
+        except Exception:
+            pass
+        for char in text:
+            sb.send_keys(selector, char)
+            time.sleep(random.uniform(0.05, 0.15))
+
 
 def check_suspicious_salary(job_details: dict) -> bool:
     pos = (job_details.get("position", "") or "").lower()
@@ -319,7 +566,7 @@ def calculate_fit_score(job_details: dict, profile: dict) -> int:
 
     # 1. Location Fit (Max 3 points)
     pref_matched = False
-    for pref in profile.get("location_pref", []):
+    for pref in (profile.get("location_pref") or []):
         if pref.lower() in job_loc:
             pref_matched = True
             break

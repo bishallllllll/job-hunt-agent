@@ -209,3 +209,173 @@ def test_apply_server_500_error(mock_server_url, candidate_profile, tmp_path, mo
 
     assert result["success"] is False
     assert "submission failed" in result["message"].lower() or "500" in result["message"]
+
+
+def test_apply_remedy_semantic_matching(mock_server_url, candidate_profile, tmp_path):
+    """Test semantic matching improvements:
+    - No name collisions on emergency, contact, referrer, relative.
+    - Experience numeric/short inputs fill with small number or ignore.
+    - Required or agreement checkboxes/radios checked.
+    """
+    resume_path = os.path.join(tmp_path, "resume.pdf")
+    with open(resume_path, "w") as f:
+        f.write("Mock Resume Content")
+
+    result = apply_to_job(
+        url=f"{mock_server_url}/apply_remedy",
+        candidate_info=candidate_profile,
+        resume_path=resume_path
+    )
+
+    assert result["success"] is True
+    assert len(submitted_applications) >= 1
+    
+    app = submitted_applications[-1]
+    assert app.get("is_remedy") is True
+    
+    # 1. Name collisions prevented
+    assert app.get("emergency_contact") == ""
+    assert app.get("referrer_name") == ""
+    assert app.get("rel_name") == ""
+    
+    # 2. Experience numeric/short input handling
+    assert app.get("experience_num") == "2"
+    assert app.get("exp_years") == "2"
+    assert app.get("experience_short") == ""
+    
+    # 3. Required/agreement checkboxes and radios
+    assert app.get("agree_req") == "on"
+    assert app.get("agree_terms") == "on"
+    assert app.get("consent_req") == "yes"
+
+
+# ==========================================
+# SeleniumBase UC Mode (Live Mode) tests
+# ==========================================
+
+from unittest.mock import patch, MagicMock
+
+class MockElementLive:
+    def __init__(self, tag_name, name_attr, type_attr, label_text=""):
+        self.tag_name = tag_name
+        self._name = name_attr
+        self._type = type_attr
+        self._label_text = label_text
+        self._selected = False
+        self.keys_sent = []
+
+    def get_attribute(self, attr):
+        if attr == "name":
+            return self._name
+        if attr == "type":
+            return self._type
+        if attr == "id":
+            return self._name + "_id"
+        return ""
+
+    def send_keys(self, keys):
+        self.keys_sent.append(keys)
+
+    def click(self):
+        self._selected = True
+
+    def clear(self):
+        pass
+
+    def is_selected(self):
+        return self._selected
+
+    @property
+    def text(self):
+        return "yes" if "yes" in self._label_text else "no"
+
+    def find_elements(self, by, selector):
+        if selector == "option":
+            return [
+                MockElementLive("option", "yes_opt", "option", "yes"),
+                MockElementLive("option", "no_opt", "option", "no")
+            ]
+        return []
+
+
+class MockDriverLive:
+    def __init__(self):
+        self.elements = [
+            MockElementLive("input", "email", "email"),
+            MockElementLive("input", "name", "text"),
+            MockElementLive("input", "phone", "text"),
+            MockElementLive("input", "resume", "file"),
+            MockElementLive("textarea", "qualifications", "textarea"),
+            MockElementLive("input", "agree", "checkbox", "agree terms"),
+            MockElementLive("select", "authorized", "select", "are you authorized to work")
+        ]
+
+    def find_elements(self, by, selector):
+        return self.elements
+
+    def find_element(self, by, selector):
+        return MockElementLive("button", "submit", "submit")
+
+
+class MockSBLive:
+    def __init__(self, uc=True, headless=True):
+        self.driver = MockDriverLive()
+        self.opened_urls = []
+        self.screenshot_saved = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+    def set_window_size(self, w, h):
+        pass
+
+    def open(self, url):
+        self.opened_urls.append(url)
+
+    def save_screenshot(self, path):
+        self.screenshot_saved = path
+        with open(path, "w") as f:
+            f.write("mock screenshot")
+
+    def is_element_visible(self, selector):
+        return True
+
+    def get_page_source(self):
+        return "<html><body><h1>success</h1></body></html>"
+
+    def execute_script(self, script, *args):
+        if "getBoundingClientRect" in script:
+            return {"x": 100, "y": 200, "left": 50, "top": 150, "width": 100, "height": 100}
+        return ""
+
+
+def test_apply_live_mode_uc(tmp_path, candidate_profile):
+    """Test SeleniumBase UC flow when SETTINGS['USE_MOCK'] = False.
+    """
+    from job_hunt_agent.search import SETTINGS
+    original_val = SETTINGS.get("USE_MOCK", True)
+    resume_path = os.path.join(tmp_path, "resume.pdf")
+    with open(resume_path, "w") as f:
+        f.write("Mock Resume Content")
+
+    screenshot_path = os.path.join(tmp_path, "screenshots", "sb_apply_success.png")
+
+    try:
+        SETTINGS["USE_MOCK"] = False
+        with patch("seleniumbase.SB", new=MockSBLive):
+            result = apply_to_job(
+                url="https://example.com/apply",
+                candidate_info=candidate_profile,
+                resume_path=resume_path,
+                screenshot_path=screenshot_path
+            )
+            assert result["success"] is True
+            assert "submitted successfully" in result["message"]
+            assert result["screenshot"] == screenshot_path
+            assert os.path.exists(screenshot_path)
+    finally:
+        SETTINGS["USE_MOCK"] = original_val
+

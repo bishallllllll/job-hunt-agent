@@ -314,3 +314,16 @@ def test_calculate_fit_score_profile_missing_skills():
     profile_empty_skills["skills"] = []
     score2 = calculate_fit_score(job, profile_empty_skills)
     assert 1 <= score2 <= 10
+
+    # location_pref is None
+    profile_none_loc_pref = profile_no_skills.copy()
+    profile_none_loc_pref["location_pref"] = None
+    score3 = calculate_fit_score(job, profile_none_loc_pref)
+    assert 1 <= score3 <= 10
+
+    # location_pref is missing
+    profile_missing_loc_pref = profile_no_skills.copy()
+    if "location_pref" in profile_missing_loc_pref:
+        del profile_missing_loc_pref["location_pref"]
+    score4 = calculate_fit_score(job, profile_missing_loc_pref)
+    assert 1 <= score4 <= 10

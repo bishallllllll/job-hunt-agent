@@ -29,3 +29,7 @@ Thumbs.db
 
 # Lock files
 .~lock.*
+
+# Session State (Cookies)
+.session_state
+.session_state/

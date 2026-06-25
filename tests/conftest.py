@@ -28,6 +28,13 @@ def clean_mock_state():
     reset_mock_state()
     yield
 
+@pytest.fixture(autouse=True)
+def mock_input(monkeypatch):
+    """Automatically mock builtins.input to return 'yes' to prevent hangs during HITL prompts in tests.
+    """
+    monkeypatch.setattr("builtins.input", lambda _: "yes")
+    yield
+
 @pytest.fixture
 def mock_server_url(mock_server_port):
     """Returns the URL of the running mock server.

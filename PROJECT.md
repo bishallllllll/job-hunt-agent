@@ -43,6 +43,7 @@ The Job Hunt Agent system is designed as a Python CLI suite and modular package.
 | 5 | R4: Auto-Apply | Automated form filling with Playwright/mock | M1, M4 | DONE (Conv ID: d5cc5189-7dc1-4516-a279-ec213b684250) |
 | 6 | R5: Email & Calendar | Email monitoring & calendar event scheduling | M1, M5 | DONE (Conv ID: d5cc5189-7dc1-4516-a279-ec213b684250) |
 | 7 | R6 & Final Validation | Manual, mock environment validation & Tier 5 coverage hardening | M1-M6 | DONE (Conv ID: d5cc5189-7dc1-4516-a279-ec213b684250) |
+| 8 | Playwright Scrapers & CLI Integration | Real scrapers (Indeed, LinkedIn, Naukri) and --live CLI search | M2-M7 | DONE (Conv ID: 66f007b5-1fda-4065-ba0b-1ba112a81f68) |
 
 ## Interface Contracts
 ### `job_hunt_agent.search` ↔ `job_hunt_agent.customizer`

@@ -68,12 +68,43 @@ class MockHTTPRequestHandler(BaseHTTPRequestHandler):
 </body>
 </html>"""
             self.wfile.write(html.encode("utf-8"))
+        elif self.path == "/apply_remedy":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.end_headers()
+            html = """<html>
+<head><title>Remedy Test Form</title></head>
+<body>
+    <h1>Remedy Form</h1>
+    <form action="/submit_remedy" method="POST" enctype="multipart/form-data">
+        Name: <input type="text" name="name"><br>
+        Email: <input type="email" name="email"><br>
+        Qualifications: <textarea name="qualifications"></textarea><br>
+        Resume: <input type="file" name="resume"><br>
+        
+        Emergency: <input type="text" name="emergency_contact" id="emergency_contact"><br>
+        Referrer: <input type="text" name="referrer_name"><br>
+        Relative: <label for="rel_name">Relative's Name</label><input type="text" id="rel_name" name="rel_name"><br>
+        
+        Exp Number: <input type="number" name="experience_num"><br>
+        Exp Years: <input type="text" name="exp_years" placeholder="Years of Experience"><br>
+        Exp Short Text: <input type="text" name="experience_short"><br>
+        
+        Req Checkbox: <input type="checkbox" name="agree_req" required><br>
+        Agreement Checkbox: <input type="checkbox" name="agree_terms"><br>
+        Req Radio: <input type="radio" name="consent_req" required value="yes"><br>
+        
+        <button type="submit">Submit</button>
+    </form>
+</body>
+</html>"""
+            self.wfile.write(html.encode("utf-8"))
         else:
             self.send_response(404)
             self.end_headers()
 
     def do_POST(self):
-        if self.path == "/submit":
+        if self.path in ["/submit", "/submit_remedy"]:
             content_type = self.headers.get("Content-Type", "")
             content_length = int(self.headers.get("Content-Length", 0))
             
@@ -105,36 +136,22 @@ class MockHTTPRequestHandler(BaseHTTPRequestHandler):
                     else:
                         form_fields[field_name] = payload.decode("utf-8").strip().replace("\r\n", "\n")
             
-            # Validation logic
-            name = form_fields.get("name", "")
-            email_val = form_fields.get("email", "")
-            qualifications = form_fields.get("qualifications", "")
-            resume = files.get("resume")
-            
-            errors = []
-            if not name:
-                errors.append("Name is required")
-            if not email_val or "@" not in email_val:
-                errors.append("Valid email is required")
-            if not qualifications:
-                errors.append("Qualifications are required")
-            if not resume or not resume["content"]:
-                errors.append("Non-empty resume file upload is required")
-                
-            if errors:
-                self.send_response(400)
-                self.send_header("Content-Type", "text/html")
-                self.end_headers()
-                err_html = f"<html><body><h1>Error</h1><p>{'; '.join(errors)}</p></body></html>"
-                self.wfile.write(err_html.encode("utf-8"))
-            else:
-                # Store application in memory
+            if self.path == "/submit_remedy":
                 app_data = {
-                    "name": name,
-                    "email": email_val,
-                    "qualifications": qualifications,
-                    "resume_name": resume["filename"],
-                    "resume_size": len(resume["content"])
+                    "is_remedy": True,
+                    "name": form_fields.get("name", ""),
+                    "email": form_fields.get("email", ""),
+                    "qualifications": form_fields.get("qualifications", ""),
+                    "resume_name": files.get("resume", {}).get("filename", "") if files.get("resume") else "",
+                    "emergency_contact": form_fields.get("emergency_contact", ""),
+                    "referrer_name": form_fields.get("referrer_name", ""),
+                    "rel_name": form_fields.get("rel_name", ""),
+                    "experience_num": form_fields.get("experience_num", ""),
+                    "exp_years": form_fields.get("exp_years", ""),
+                    "experience_short": form_fields.get("experience_short", ""),
+                    "agree_req": form_fields.get("agree_req", ""),
+                    "agree_terms": form_fields.get("agree_terms", ""),
+                    "consent_req": form_fields.get("consent_req", "")
                 }
                 submitted_applications.append(app_data)
                 
@@ -143,6 +160,45 @@ class MockHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 success_html = "<html><body><h1>Success</h1><p>Application submitted!</p></body></html>"
                 self.wfile.write(success_html.encode("utf-8"))
+            else:
+                # Validation logic
+                name = form_fields.get("name", "")
+                email_val = form_fields.get("email", "")
+                qualifications = form_fields.get("qualifications", "")
+                resume = files.get("resume")
+                
+                errors = []
+                if not name:
+                    errors.append("Name is required")
+                if not email_val or "@" not in email_val:
+                    errors.append("Valid email is required")
+                if not qualifications:
+                    errors.append("Qualifications are required")
+                if not resume or not resume["content"]:
+                    errors.append("Non-empty resume file upload is required")
+                    
+                if errors:
+                    self.send_response(400)
+                    self.send_header("Content-Type", "text/html")
+                    self.end_headers()
+                    err_html = f"<html><body><h1>Error</h1><p>{'; '.join(errors)}</p></body></html>"
+                    self.wfile.write(err_html.encode("utf-8"))
+                else:
+                    # Store application in memory
+                    app_data = {
+                        "name": name,
+                        "email": email_val,
+                        "qualifications": qualifications,
+                        "resume_name": resume["filename"],
+                        "resume_size": len(resume["content"])
+                    }
+                    submitted_applications.append(app_data)
+                    
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/html")
+                    self.end_headers()
+                    success_html = "<html><body><h1>Success</h1><p>Application submitted!</p></body></html>"
+                    self.wfile.write(success_html.encode("utf-8"))
         else:
             self.send_response(404)
             self.end_headers()
